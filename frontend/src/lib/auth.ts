@@ -91,6 +91,27 @@ export async function login(
   return session;
 }
 
+export async function registerMerchant(
+  email: string,
+  business_name: string,
+  notification_email: string
+): Promise<{ message: string; merchant: any }> {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+
+  const res = await fetch(`${apiUrl}/api/merchants/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, business_name, notification_email }),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? "Registration failed");
+  }
+
+  return await res.json();
+}
+
 export function logout(): void {
   clearToken();
 }
