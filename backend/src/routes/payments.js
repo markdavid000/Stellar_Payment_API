@@ -8,7 +8,10 @@ import {
 } from "../lib/stellar.js";
 import { supabase } from "../lib/supabase.js";
 import { validateUuidParam } from "../lib/validate-uuid.js";
-import { paymentSessionZodSchema } from "../lib/request-schemas.js";
+import {
+  paymentSessionZodSchema,
+  parseVersionedPaymentBody,
+} from "../lib/request-schemas.js";
 import { createCreatePaymentRateLimit } from "../lib/create-payment-rate-limit.js";
 import { sendWebhook } from "../lib/webhooks.js";
 import { resolveBrandingConfig } from "../lib/branding.js";
@@ -119,7 +122,29 @@ function createPaymentsRouter({
    */
   async function createSession(req, res, next) {
     try {
-      const body = paymentSessionZodSchema.parse(req.body || {});
+      const body = parseVersionedPaymentBody(req);
+
+      // Per-asset payment limit validation (#153)
+      const limits = req.merchant.payment_limits;
+      if (limits && typeof limits === "object") {
+        const assetLimits = limits[body.asset];
+        if (assetLimits) {
+          if (assetLimits.min !== undefined && body.amount < assetLimits.min) {
+            return res.status(400).json({
+              error: `Amount is below the minimum for ${body.asset}`,
+              min: assetLimits.min,
+              delta: Number((assetLimits.min - body.amount).toFixed(7)),
+            });
+          }
+          if (assetLimits.max !== undefined && body.amount > assetLimits.max) {
+            return res.status(400).json({
+              error: `Amount exceeds the maximum for ${body.asset}`,
+              max: assetLimits.max,
+              delta: Number((body.amount - assetLimits.max).toFixed(7)),
+            });
+          }
+        }
+      }
 
       const paymentId = randomUUID();
       const now = new Date().toISOString();
