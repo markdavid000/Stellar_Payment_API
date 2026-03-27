@@ -69,8 +69,15 @@ function paymentMatchesAsset(payment, asset) {
     return payment.asset_type === "native";
   }
 
+  const expectedCode =
+    typeof asset.getCode === "function" ? asset.getCode() : asset.code;
+  const expectedIssuer =
+    typeof asset.getIssuer === "function" ? asset.getIssuer() : asset.issuer;
+
   return (
-    payment.asset_code === asset.code && payment.asset_issuer === asset.issuer
+    String(payment.asset_code || "").toUpperCase() ===
+      String(expectedCode || "").toUpperCase() &&
+    String(payment.asset_issuer || "") === String(expectedIssuer || "")
   );
 }
 
@@ -126,9 +133,12 @@ function handleHorizonError(err, context = "") {
 function memoMatches(tx, expectedMemo, expectedMemoType) {
   const txMemoType = (tx.memo_type || "none").toLowerCase();
   const wantType = (expectedMemoType || "text").toLowerCase();
+  const normalizedTxMemo = tx.memo == null ? "" : String(tx.memo);
+  const normalizedExpectedMemo =
+    expectedMemo == null ? "" : String(expectedMemo);
 
   if (txMemoType !== wantType) return false;
-  return String(tx.memo) === String(expectedMemo);
+  return normalizedTxMemo === normalizedExpectedMemo;
 }
 
 /**
